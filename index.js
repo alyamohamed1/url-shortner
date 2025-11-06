@@ -16,9 +16,9 @@ app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false })); // parses form data
 app.use('/public', express.static(`${process.cwd()}/public`));
 
-// Root route
+// Root route (serve your index.html directly)
 app.get('/', (req, res) => {
-  res.sendFile(process.cwd() + '/views/index.html');
+  res.sendFile(process.cwd() + '/index.html');
 });
 
 // FCC test route
@@ -76,4 +76,5 @@ app.get('/api/shorturl/:short_url', (req, res) => {
 });
 
 // Start server
-app.listen(port, () => console.log(`Listening on port ${port}`));
+app.listen(port, () => console.log(`✅ Server listening on port ${port}`));
+
