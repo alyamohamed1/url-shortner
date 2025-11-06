@@ -1,77 +1,64 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const app = express();
 const bodyParser = require('body-parser');
 const dns = require('dns');
-const { URL } = require('url');
+const urlParser = require('url');
 
-const app = express();
+// Basic Configuration
+const port = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(express.static('public'));
+app.use('/public', express.static(`${process.cwd()}/public`));
 
-// Root route
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
+app.get('/', function (req, res) {
+  res.sendFile(process.cwd() + '/views/index.html');
 });
 
-// In-memory store
+// In-memory database substitute
 let urls = [];
-let counter = 1;
+let id = 1;
 
-// POST endpoint: create short URL
-app.post('/api/shorturl', (req, res) => {
-  const inputUrl = req.body.url;
+// POST endpoint for shortening URLs
+app.post('/api/shorturl', function (req, res) {
+  const originalUrl = req.body.url;
 
-  // Validate URL syntax
-  let parsedUrl;
   try {
-    parsedUrl = new URL(inputUrl);
-  } catch (err) {
-    return res.json({ error: 'invalid url' });
-  }
+    const parsedUrl = new URL(originalUrl);
 
-  // Check protocol
-  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    return res.json({ error: 'invalid url' });
-  }
-
-  // DNS lookup to verify host
-  dns.lookup(parsedUrl.hostname, (err) => {
-    if (err) {
+    // Validate protocol (http or https only)
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
       return res.json({ error: 'invalid url' });
     }
 
-    // Return existing URL if found
-    const found = urls.find((u) => u.original_url === inputUrl);
-    if (found) return res.json(found);
+    // Check if the hostname is valid via DNS
+    dns.lookup(parsedUrl.hostname, (err) => {
+      if (err) return res.json({ error: 'invalid url' });
 
-    // Otherwise, add new record
-    const newEntry = {
-      original_url: inputUrl,
-      short_url: counter,
-    };
-    urls.push(newEntry);
-    counter++;
-
-    res.json(newEntry);
-  });
+      // Store URL and return response
+      urls.push({ original_url: originalUrl, short_url: id });
+      res.json({ original_url: originalUrl, short_url: id });
+      id++;
+    });
+  } catch {
+    res.json({ error: 'invalid url' });
+  }
 });
 
-// GET endpoint: redirect short URL
-app.get('/api/shorturl/:short_url', (req, res) => {
-  const id = parseInt(req.params.short_url);
-  const found = urls.find((u) => u.short_url === id);
+// GET endpoint to redirect
+app.get('/api/shorturl/:short_url', function (req, res) {
+  const shortUrl = parseInt(req.params.short_url);
+  const entry = urls.find((u) => u.short_url === shortUrl);
 
-  if (!found) return res.json({ error: 'No short URL found for the given input' });
-
-  res.redirect(found.original_url);
+  if (entry) {
+    res.redirect(entry.original_url);
+  } else {
+    res.json({ error: 'No short URL found for the given input' });
+  }
 });
 
-// Start server
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`✅ Server is running on port ${port}`);
+app.listen(port, function () {
+  console.log(`Listening on port ${port}`);
 });
