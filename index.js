@@ -1,3 +1,4 @@
+// index.js
 // URL Shortener Microservice
 
 require('dotenv').config();
@@ -8,83 +9,77 @@ const dns = require('dns');
 const { URL } = require('url');
 
 const app = express();
-
-// Basic Configuration
 const port = process.env.PORT || 3000;
 
+// Basic config
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use('/public', express.static(`${process.cwd()}/public`));
 
-// Home page
-app.get('/', function (req, res) {
+// Serve home page
+app.get('/', (req, res) => {
   res.sendFile(process.cwd() + '/views/index.html');
 });
 
-// FCC hello endpoint (keep it)
-app.get('/api/hello', function (req, res) {
+// Required FCC hello route
+app.get('/api/hello', (req, res) => {
   res.json({ greeting: 'hello API' });
 });
 
-// In-memory "database" for URLs
-let urlStore = [];
-let nextId = 1;
+// === In-memory URL store ===
+let urlDatabase = [];
+let counter = 1;
 
-// POST /api/shorturl  -> create / return a short URL
-app.post('/api/shorturl', function (req, res) {
+// === POST /api/shorturl ===
+app.post('/api/shorturl', (req, res) => {
   const inputUrl = req.body.url;
 
-  // Basic URL format + protocol check
+  // Validate basic URL format
   let parsed;
   try {
     parsed = new URL(inputUrl);
-  } catch (e) {
+  } catch {
     return res.json({ error: 'invalid url' });
   }
 
+  // Must start with http or https
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     return res.json({ error: 'invalid url' });
   }
 
-  // Verify host exists using DNS
-  dns.lookup(parsed.hostname, function (err) {
+  // Check domain validity with DNS
+  dns.lookup(parsed.hostname, (err) => {
     if (err) {
       return res.json({ error: 'invalid url' });
     }
 
-    // If we've already shortened this URL, reuse it
-    const existing = urlStore.find((entry) => entry.original_url === inputUrl);
-    if (existing) {
-      return res.json(existing);
-    }
+    // Check if it already exists
+    const existing = urlDatabase.find((e) => e.original_url === inputUrl);
+    if (existing) return res.json(existing);
 
-    const record = {
+    const newEntry = {
       original_url: inputUrl,
-      short_url: nextId,
+      short_url: counter
     };
-    urlStore.push(record);
-    nextId += 1;
+    urlDatabase.push(newEntry);
+    counter++;
 
-    res.json(record);
+    res.json(newEntry);
   });
 });
 
-// GET /api/shorturl/:short_url  -> redirect to original
-app.get('/api/shorturl/:short_url', function (req, res) {
-  const id = parseInt(req.params.short_url, 10);
-
-  const record = urlStore.find((entry) => entry.short_url === id);
-
-  if (!record) {
-    // Not required by tests, but nice to have:
-    return res.json({ error: 'No short URL found for the given input' });
-  }
+// === GET /api/shorturl/:id ===
+app.get('/api/shorturl/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const record = urlDatabase.find((e) => e.short_url === id);
+  if (!record) return res.json({ error: 'No short URL found for given input' });
 
   res.redirect(record.original_url);
 });
 
-// Start server
-app.listen(port, function () {
+// === Start server ===
+app.listen(port, () => {
   console.log(`Listening on port ${port}`);
 });
+
 
