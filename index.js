@@ -1,4 +1,3 @@
-// index.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -7,7 +6,6 @@ const dns = require('dns');
 const { URL } = require('url');
 
 const app = express();
-const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
@@ -19,15 +17,15 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
 });
 
-// In-memory URL storage
+// In-memory store
 let urls = [];
 let counter = 1;
 
-// POST: create short URL
+// POST endpoint: create short URL
 app.post('/api/shorturl', (req, res) => {
   const inputUrl = req.body.url;
 
-  // Validate URL format
+  // Validate URL syntax
   let parsedUrl;
   try {
     parsedUrl = new URL(inputUrl);
@@ -35,45 +33,45 @@ app.post('/api/shorturl', (req, res) => {
     return res.json({ error: 'invalid url' });
   }
 
-  // Ensure http/https
-  if (!/^https?:\/\//i.test(inputUrl)) {
+  // Check protocol
+  if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
     return res.json({ error: 'invalid url' });
   }
 
-  // Verify hostname with DNS lookup
+  // DNS lookup to verify host
   dns.lookup(parsedUrl.hostname, (err) => {
     if (err) {
       return res.json({ error: 'invalid url' });
     }
 
-    // Check for existing URL
-    const existing = urls.find((u) => u.original_url === inputUrl);
-    if (existing) return res.json(existing);
+    // Return existing URL if found
+    const found = urls.find((u) => u.original_url === inputUrl);
+    if (found) return res.json(found);
 
-    const newUrl = {
+    // Otherwise, add new record
+    const newEntry = {
       original_url: inputUrl,
       short_url: counter,
     };
-    urls.push(newUrl);
+    urls.push(newEntry);
     counter++;
 
-    res.json(newUrl);
+    res.json(newEntry);
   });
 });
 
-// GET: redirect short URL
+// GET endpoint: redirect short URL
 app.get('/api/shorturl/:short_url', (req, res) => {
   const id = parseInt(req.params.short_url);
-  const record = urls.find((u) => u.short_url === id);
+  const found = urls.find((u) => u.short_url === id);
 
-  if (!record) {
-    return res.json({ error: 'No short URL found for the given input' });
-  }
+  if (!found) return res.json({ error: 'No short URL found for the given input' });
 
-  res.redirect(record.original_url);
+  res.redirect(found.original_url);
 });
 
 // Start server
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`✅ Server running on port ${port}`);
+  console.log(`✅ Server is running on port ${port}`);
 });
